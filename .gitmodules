@@ -1,9 +1,9 @@
 [submodule "assets"]
 	path = assets
-	url = E:/shazan/npr_main/assets
+	url = https://github.com/msmshazan/nprassets.git
 [submodule "tools"]
 	path = tools
-	url = E:/shazan/npr_main/tools
+	url = https://github.com/msmshazan/nprtools.git
 [submodule "deps"]
 	path = deps
-	url = E:/shazan/npr_main/deps
+	url = https://github.com/msmshazan/nprdeps.git

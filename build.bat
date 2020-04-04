@@ -28,5 +28,5 @@ xcopy %LibraryLocation%*.dll . /Q /Y
 REM TexturePacker.exe ATLAS ..\assets\images -j -u -v -x -b -p 
 REM TexturePacker.exe Test ..\assets\test -j -u -v -x -b -p -r
 REM geometryc -f ..\assets\cube.glb -o cube.bin --packnormal 1
-geometryc -f ..\assets\cube.glb -o cube.bin --packnormal 1 > NUL 2> NUL
+geometryc -f ..\assets\bunny.obj -o bunny.bin --lh-up+y
 cd ..

@@ -27,6 +27,7 @@ GitHub:
   https://github.com/zpl-c/zpl
 
 Version History:
+  10.1.0  - Additional math methods (thanks to funZX and msmshazan)
   10.0.15 - WIP Emscripten fixes
   10.0.14 - FreeBSD support
   10.0.13 - OpenBSD support
@@ -252,8 +253,8 @@ Version History:
 #define ZPL_H
 
 #define ZPL_VERSION_MAJOR 10
-#define ZPL_VERSION_MINOR 0
-#define ZPL_VERSION_PATCH 15
+#define ZPL_VERSION_MINOR 2
+#define ZPL_VERSION_PATCH 0
 #define ZPL_VERSION_PRE ""
 
 // file: zpl_hedley.h
@@ -2632,6 +2633,10 @@ typedef zpl_i32 zpl_b32;
         #include <stdbool.h>
     #endif
 #endif
+
+#if __cplusplus > 199711L
+#define register      // Deprecated in C++11.
+#endif  // #if __cplusplus > 199711L
 
 #ifndef ZPL_U8_MIN
     #define ZPL_U8_MIN 0u
@@ -5566,6 +5571,20 @@ ZPL_END_C_DECLS
             ((i&0x000000ff00000000ull)>>8)  | ((i&0x00000000ff000000ull)<<8);
     }
 
+    ZPL_IMPL_INLINE zpl_i32 zpl_next_pow2(zpl_i32 x) {
+        x--;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x |= x >> 8;
+        x |= x >> 16;
+        return x + 1;
+    }
+
+    ZPL_IMPL_INLINE void zpl_bit_set(zpl_u32* x, zpl_u32 bit) { *x = *x | (1 << bit); }
+    ZPL_IMPL_INLINE zpl_b8 zpl_bit_get(zpl_u32 x, zpl_u32 bit) { return (x & (1 << bit)); }
+    ZPL_IMPL_INLINE void zpl_bit_reset(zpl_u32* x, zpl_u32 bit) { *x = *x & ~(1 << bit); }
+
     ZPL_IMPL_INLINE zpl_isize zpl_count_set_bits(zpl_u64 mask) {
         zpl_isize count = 0;
         while (mask) {
@@ -6169,6 +6188,9 @@ ZPL_END_C_DECLS
         struct {
             zpl_f32 x, y;
         };
+        struct {
+            zpl_f32 s, t;
+        };
         zpl_f32 e[2];
     } zpl_vec2;
 
@@ -6179,8 +6201,12 @@ ZPL_END_C_DECLS
         struct {
             zpl_f32 r, g, b;
         };
+        struct {
+            zpl_f32 s, t, p;
+        };
 
         zpl_vec2 xy;
+        zpl_vec2 st;
         zpl_f32 e[3];
     } zpl_vec3;
 
@@ -6192,7 +6218,13 @@ ZPL_END_C_DECLS
             zpl_f32 r, g, b, a;
         };
         struct {
+            zpl_f32 s, t, p, q;
+        };
+        struct {
             zpl_vec2 xy, zw;
+        };
+        struct {
+            zpl_vec2 st, pq;
         };
         zpl_vec3 xyz;
         zpl_vec3 rgb;
@@ -6231,6 +6263,24 @@ ZPL_END_C_DECLS
         zpl_vec3 xyz;
         zpl_f32 e[4];
     } zpl_quat;
+
+    typedef union zpl_plane {
+        struct {
+            zpl_f32 a, b, c, d;
+        };
+        zpl_vec4 xyzw;
+        zpl_vec3 n;
+        zpl_f32 e[4];
+    } zpl_plane;
+
+    typedef struct zpl_frustum {
+        zpl_plane x1;
+        zpl_plane x2;
+        zpl_plane y1;
+        zpl_plane y2;
+        zpl_plane z1;
+        zpl_plane z2;
+    } zpl_frustum;
 
     typedef zpl_f32 zpl_float2[2];
     typedef zpl_f32 zpl_float3[3];
@@ -6346,11 +6396,14 @@ ZPL_END_C_DECLS
     ZPL_DEF zpl_vec4 zpl_vec4f(zpl_f32 x, zpl_f32 y, zpl_f32 z, zpl_f32 w);
     ZPL_DEF zpl_vec4 zpl_vec4fv(zpl_f32 x[4]);
 
+    ZPL_DEF zpl_f32 zpl_vec2_max(zpl_vec2 v);
+    ZPL_DEF zpl_f32 zpl_vec2_side(zpl_vec2 p, zpl_vec2 q, zpl_vec2 r);
     ZPL_DEF void zpl_vec2_add(zpl_vec2 *d, zpl_vec2 v0, zpl_vec2 v1);
     ZPL_DEF void zpl_vec2_sub(zpl_vec2 *d, zpl_vec2 v0, zpl_vec2 v1);
     ZPL_DEF void zpl_vec2_mul(zpl_vec2 *d, zpl_vec2 v, zpl_f32 s);
     ZPL_DEF void zpl_vec2_div(zpl_vec2 *d, zpl_vec2 v, zpl_f32 s);
 
+    ZPL_DEF zpl_f32 zpl_vec3_max(zpl_vec3 v);
     ZPL_DEF void zpl_vec3_add(zpl_vec3 *d, zpl_vec3 v0, zpl_vec3 v1);
     ZPL_DEF void zpl_vec3_sub(zpl_vec3 *d, zpl_vec3 v0, zpl_vec3 v1);
     ZPL_DEF void zpl_vec3_mul(zpl_vec3 *d, zpl_vec3 v, zpl_f32 s);
@@ -6447,6 +6500,7 @@ ZPL_END_C_DECLS
 
     ZPL_DEF void zpl_mat4_identity(zpl_mat4 *m);
     ZPL_DEF void zpl_float44_identity(zpl_f32 m[4][4]);
+    ZPL_DEF void zpl_mat4_copy(zpl_mat4* out, zpl_mat4* m);
 
     ZPL_DEF void zpl_mat4_transpose(zpl_mat4 *m);
     ZPL_DEF void zpl_mat4_mul(zpl_mat4 *out, zpl_mat4 *m1, zpl_mat4 *m2);
@@ -6469,16 +6523,20 @@ ZPL_END_C_DECLS
     ZPL_DEF void zpl_mat4_scale(zpl_mat4 *out, zpl_vec3 v);
     ZPL_DEF void zpl_mat4_scalef(zpl_mat4 *out, zpl_f32 s);
     ZPL_DEF void zpl_mat4_ortho2d(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top);
-    ZPL_DEF void zpl_mat4_ortho2d_DX(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top);
     ZPL_DEF void zpl_mat4_ortho3d(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top, zpl_f32 z_near, zpl_f32 z_far);
-    ZPL_DEF void zpl_mat4_ortho3d_DX(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top, zpl_f32 z_near, zpl_f32 z_far);
     ZPL_DEF void zpl_mat4_perspective(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far);
-    ZPL_DEF void zpl_mat4_perspective_DX(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far);
     ZPL_DEF void zpl_mat4_infinite_perspective(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near);
-    ZPL_DEF void zpl_mat4_infinite_perspective_DX(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near);
+
+    ZPL_DEF void zpl_mat4_ortho2d_dx(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top);
+    ZPL_DEF void zpl_mat4_ortho3d_dx(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top, zpl_f32 z_near, zpl_f32 z_far);
+    ZPL_DEF void zpl_mat4_perspective_dx(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far);
+    ZPL_DEF void zpl_mat4_infinite_perspective_dx(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near);
 
     ZPL_DEF void zpl_mat4_look_at(zpl_mat4 *out, zpl_vec3 eye, zpl_vec3 centre, zpl_vec3 up);
 
+    ZPL_DEF void zpl_mat4_look_at_lh(zpl_mat4 *out, zpl_vec3 eye, zpl_vec3 centre, zpl_vec3 up);
+    ZPL_DEF void zpl_mat4_perspective_dx_lh(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far);
+    
     ZPL_DEF zpl_quat zpl_quatf(zpl_f32 x, zpl_f32 y, zpl_f32 z, zpl_f32 w);
     ZPL_DEF zpl_quat zpl_quatfv(zpl_f32 e[4]);
     ZPL_DEF zpl_quat zpl_quat_axis_angle(zpl_vec3 axis, zpl_f32 angle_radians);
@@ -6519,6 +6577,15 @@ ZPL_END_C_DECLS
     ZPL_DEF void zpl_quat_rotate_vec3(zpl_vec3 *d, zpl_quat q, zpl_vec3 v);
     ZPL_DEF void zpl_mat4_from_quat(zpl_mat4 *out, zpl_quat q);
     ZPL_DEF void zpl_quat_from_mat4(zpl_quat *out, zpl_mat4 *m);
+
+    /* Plane math. */
+    ZPL_DEF zpl_f32 zpl_plane_distance(zpl_plane* p, zpl_vec3 v);
+
+    /* Frustum culling. */
+    ZPL_DEF void zpl_frustum_create(zpl_frustum* out, zpl_mat4* camera, zpl_mat4* proj);
+    ZPL_DEF zpl_b8 zpl_frustum_sphere_inside(zpl_frustum* frustum, zpl_vec3 center, zpl_f32 radius);
+    ZPL_DEF zpl_b8 zpl_frustum_point_inside(zpl_frustum* frustum, zpl_vec3 point);
+    ZPL_DEF zpl_b8 zpl_frustum_box_inside(zpl_frustum* frustum, zpl_aabb3 box);
 
     /* Interpolations */
     ZPL_DEF zpl_f32 zpl_lerp(zpl_f32 a, zpl_f32 b, zpl_f32 t);
@@ -13378,10 +13445,15 @@ ZPL_END_C_DECLS
         return v;
     }
 
+    zpl_f32 zpl_vec2_max(zpl_vec2 v) { return zpl_max(v.x, v.y); }
+    zpl_f32 zpl_vec2_side(zpl_vec2 p, zpl_vec2 q, zpl_vec2 r) { return ((q.x - p.x) * (r.y - p.y) - (r.x - p.x) * (q.y - p.y)); }
+
     void zpl_vec2_add(zpl_vec2 *d, zpl_vec2 v0, zpl_vec2 v1) { ZPL_VEC2_3OP(d, v0, +, v1, +0); }
     void zpl_vec2_sub(zpl_vec2 *d, zpl_vec2 v0, zpl_vec2 v1) { ZPL_VEC2_3OP(d, v0, -, v1, +0); }
     void zpl_vec2_mul(zpl_vec2 *d, zpl_vec2 v, zpl_f32 s)    { ZPL_VEC2_2OP(d, v, *s); }
     void zpl_vec2_div(zpl_vec2 *d, zpl_vec2 v, zpl_f32 s)    { ZPL_VEC2_2OP(d, v, / s); }
+
+    zpl_f32 zpl_vec3_max(zpl_vec3 v) { return zpl_max3(v.x, v.y, v.z); }
 
     void zpl_vec3_add(zpl_vec3 *d, zpl_vec3 v0, zpl_vec3 v1) { ZPL_VEC3_3OP(d, v0, +, v1, +0); }
     void zpl_vec3_sub(zpl_vec3 *d, zpl_vec3 v0, zpl_vec3 v1) { ZPL_VEC3_3OP(d, v0, -, v1, +0); }
@@ -13521,6 +13593,10 @@ ZPL_END_C_DECLS
         m[1][1] = 1;
     }
 
+    void zpl_mat2_copy(zpl_mat2* out, zpl_mat2* m) {
+        zpl_memcopy(out, m, sizeof(zpl_mat3));
+    }
+
     void zpl_mat2_mul_vec2(zpl_vec2 *out, zpl_mat2 *m, zpl_vec2 in) { zpl_float22_mul_vec2(out, zpl_float22_m(m), in); }
 
     zpl_mat2 *zpl_mat2_v(zpl_vec2 m[2])   { return (zpl_mat2 *)m; }
@@ -13581,6 +13657,10 @@ ZPL_END_C_DECLS
 
     void zpl_mat3_transpose(zpl_mat3 *m) { zpl_float33_transpose(zpl_float33_m(m)); }
     void zpl_mat3_identity(zpl_mat3 *m)  { zpl_float33_identity(zpl_float33_m(m)); }
+
+    void zpl_mat3_copy(zpl_mat3* out, zpl_mat3* m) {
+        zpl_memcopy(out, m, sizeof(zpl_mat3));
+    }
 
     void zpl_mat3_mul(zpl_mat3 *out, zpl_mat3 *m1, zpl_mat3 *m2) {
         zpl_float33_mul(zpl_float33_m(out), zpl_float33_m(m1), zpl_float33_m(m2));
@@ -13670,6 +13750,11 @@ ZPL_END_C_DECLS
 
     void zpl_mat4_transpose(zpl_mat4 *m) { zpl_float44_transpose(zpl_float44_m(m)); }
     void zpl_mat4_identity(zpl_mat4 *m)  { zpl_float44_identity(zpl_float44_m(m)); }
+
+    void zpl_mat4_copy(zpl_mat4* out, zpl_mat4* m) {
+        zpl_memcopy(out, m, sizeof(zpl_mat4));
+    }
+
 
     void zpl_mat4_mul(zpl_mat4 *out, zpl_mat4 *m1, zpl_mat4 *m2) {
         zpl_float44_mul(zpl_float44_m(out), zpl_float44_m(m1), zpl_float44_m(m2));
@@ -13911,6 +13996,72 @@ ZPL_END_C_DECLS
         m[3][2] = -2.0f * z_near;
     }
 
+    void zpl_mat4_ortho2d_dx(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top) {
+        zpl_float4 *m;
+        zpl_mat4_identity(out);
+        m = zpl_float44_m(out);
+
+        m[0][0] = 2.0f / (right - left);
+        m[1][1] = 2.0f / (top - bottom);
+        m[2][2] = -1.0f;
+        m[3][0] = -(right + left) / (right - left);
+        m[3][1] = -(top + bottom) / (top - bottom);
+    }
+
+    void zpl_mat4_ortho3d_dx(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top, zpl_f32 z_near, zpl_f32 z_far) {
+        zpl_float4 *m;
+        zpl_mat4_identity(out);
+        m = zpl_float44_m(out);
+
+        m[0][0] = +2.0f / (right - left);
+        m[1][1] = +2.0f / (top - bottom);
+        m[2][2] = -1.0f / (z_far - z_near);
+        m[3][0] = -(right + left) / (right - left);
+        m[3][1] = -(top + bottom) / (top - bottom);
+        m[3][2] = -( z_near) / (z_far - z_near);
+    }
+
+    void zpl_mat4_perspective_dx(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far) {
+        zpl_f32 tan_half_fovy = zpl_tan(0.5f * fovy);
+        zpl_mat4 zero_mat = { 0 };
+        zpl_float4 *m = zpl_float44_m(out);
+        *out = zero_mat;
+
+        m[0][0] = 1.0f / (aspect * tan_half_fovy);
+        m[1][1] = 1.0f / (tan_half_fovy);
+        m[2][2] = -(z_far ) / (z_far - z_near);
+        m[2][3] = -1.0f;
+        m[3][2] = - z_near*(z_far / (z_far - z_near));
+    }
+
+    void zpl_mat4_perspective_dx_lh(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far) {
+        zpl_f32 tan_half_fovy = zpl_tan(0.5f * fovy);
+        zpl_mat4 zero_mat = { 0 };
+        zpl_float4 *m = zpl_float44_m(out);
+        *out = zero_mat;
+
+        m[0][0] = 1.0f / (aspect * tan_half_fovy);
+        m[1][1] = 1.0f / (tan_half_fovy);
+        m[2][2] = (z_far ) / (z_far - z_near);
+        m[2][3] = 1.0f;
+        m[3][2] =  -z_near*(z_far / (z_far - z_near));
+    }
+
+    void zpl_mat4_infinite_perspective_dx(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near) {
+         zpl_f32 tan_half_fovy = zpl_tan(0.5f * fovy);
+        zpl_mat4 zero_mat = { 0 };
+        zpl_float4 *m = zpl_float44_m(out);
+        *out = zero_mat;
+
+        m[0][0] = 1.0f / (aspect * tan_half_fovy);
+        m[1][1] = 1.0f / (tan_half_fovy);
+        m[2][2] = -1.0f;
+        m[2][3] = -1.0f;
+        m[3][2] = - z_near;
+    }
+
+
+
     void zpl_mat4_look_at(zpl_mat4 *out, zpl_vec3 eye, zpl_vec3 centre, zpl_vec3 up) {
         zpl_vec3 f, s, u;
         zpl_float4 *m;
@@ -13943,64 +14094,38 @@ ZPL_END_C_DECLS
         m[3][2] = +zpl_vec3_dot(f, eye);
     }
 
-   void zpl_mat4_ortho2d_DX(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top) {
-       // TODO(shazan): Implement
-       zpl_float4 *m;
-        zpl_mat4_identity(out);
-        m = zpl_float44_m(out);
-
-        m[0][0] = 2.0f / (right - left);
-        m[1][1] = 2.0f / (top - bottom);
-        m[2][2] = -1.0f;
-        m[3][0] = -(right + left) / (right - left);
-        m[3][1] = -(top + bottom) / (top - bottom);
-    }
-
-    void zpl_mat4_ortho3d_DX(zpl_mat4 *out, zpl_f32 left, zpl_f32 right, zpl_f32 bottom, zpl_f32 top, zpl_f32 z_near, zpl_f32 z_far) {
+    void zpl_mat4_look_at_lh(zpl_mat4 *out, zpl_vec3 eye, zpl_vec3 centre, zpl_vec3 up) {
+        zpl_vec3 view, right, _up;
         zpl_float4 *m;
-        zpl_mat4_identity(out);
+
+        zpl_vec3_sub(&view, centre, eye);
+        zpl_vec3_norm(&view, view);
+
+        zpl_vec3_cross(&right, up, view);
+        zpl_vec3_norm(&right, right);
+
+        zpl_vec3_cross(&_up, view, right);
+
         m = zpl_float44_m(out);
 
-        m[0][0] = +2.0f / (right - left);
-        m[1][1] = +2.0f / (top - bottom);
-        m[2][2] = -1.0f / (z_far - z_near);
-        m[3][0] = -(right + left) / (right - left);
-        m[3][1] = -(top + bottom) / (top - bottom);
-        m[3][2] = -( z_near) / (z_far - z_near);
-    }
- 
-    void zpl_mat4_perspective_DX(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near, zpl_f32 z_far) {
-        zpl_f32 tan_half_fovy = zpl_tan(0.5f * fovy);
-        zpl_mat4 zero_mat = { 0 };
-        zpl_float4 *m = zpl_float44_m(out);
-        *out = zero_mat;
+        m[0][0] = +right.x;
+        m[0][1] = +_up.x;
+        m[0][2] = +view.x;
 
-        m[0][0] = 1.0f / (aspect * tan_half_fovy);
-        m[1][1] = 1.0f / (tan_half_fovy);
-        m[2][2] = -(z_far / (z_far - z_near));
-        m[2][3] = -1.0f;
-        m[3][2] = -(z_near *( z_far / (z_far - z_near)));
+        m[1][0] = +right.y;
+        m[1][1] = +_up.y;
+        m[1][2] = +view.y;
+
+        m[2][0] = +right.z;
+        m[2][1] = +_up.z;
+        m[2][2] = +view.z;
+
+        m[3][0] = -zpl_vec3_dot(right, eye);
+        m[3][1] = -zpl_vec3_dot(_up, eye);
+        m[3][2] = -zpl_vec3_dot(view, eye);
+        m[3][3] = 1.0f;
     }
 
-    void zpl_mat4_infinite_perspective_DX(zpl_mat4 *out, zpl_f32 fovy, zpl_f32 aspect, zpl_f32 z_near) {
-        //TODO(shazan) : Implement
-        zpl_f32 range = zpl_tan(0.5f * fovy) * z_near;
-        zpl_f32 left = -range * aspect;
-        zpl_f32 right = range * aspect;
-        zpl_f32 bottom = -range;
-        zpl_f32 top = range;
-        zpl_mat4 zero_mat = { 0 };
-        zpl_float4 *m = zpl_float44_m(out);
-        *out = zero_mat;
-
-        m[0][0] = (2.0f * z_near) / (right - left);
-        m[1][1] = (2.0f * z_near) / (top - bottom);
-        m[2][2] = -1.0f;
-        m[2][3] = -1.0f;
-        m[3][2] = -2.0f * z_near;
-    }
-
-   
     zpl_quat zpl_quatf(zpl_f32 x, zpl_f32 y, zpl_f32 z, zpl_f32 w) {
         zpl_quat q;
         q.x = x;
@@ -14216,6 +14341,165 @@ ZPL_END_C_DECLS
                 out->z = biggest_value;
                 break;
         }
+    }
+
+    zpl_f32 zpl_plane_distance(zpl_plane* p, zpl_vec3 v) {
+        return (p->a * v.x + p->b * v.y + p->c * v.z + p->d);
+    }
+
+    void zpl_frustum_create(zpl_frustum* out, zpl_mat4* camera, zpl_mat4* proj) {
+        zpl_mat4 pv;
+
+        zpl_mat4_mul(&pv, camera, proj);
+
+        register zpl_plane* fp = 0;
+        zpl_f32 rmag;
+
+        fp = &out->x1;
+        fp->a = pv.x.w + pv.x.x;
+        fp->b = pv.y.w + pv.x.y;
+        fp->c = pv.z.w + pv.x.z;
+        fp->d = pv.w.w + pv.x.w;
+
+        rmag = zpl_rsqrt(zpl_square(fp->a) + zpl_square(fp->b) + zpl_square(fp->c));
+
+        fp->a *= rmag;
+        fp->b *= rmag;
+        fp->c *= rmag;
+        fp->d *= rmag;
+
+        fp = &out->x2;
+
+        fp->a = pv.x.w - pv.x.x;
+        fp->b = pv.y.w - pv.x.y;
+        fp->c = pv.z.w - pv.x.z;
+        fp->d = pv.w.w - pv.x.w;
+
+        rmag = zpl_rsqrt(zpl_square(fp->a) + zpl_square(fp->b) + zpl_square(fp->c));
+
+        fp->a *= rmag;
+        fp->b *= rmag;
+        fp->c *= rmag;
+        fp->d *= rmag;
+
+        fp = &out->y1;
+
+        fp->a = pv.x.w - pv.y.x;
+        fp->b = pv.y.w - pv.y.y;
+        fp->c = pv.z.w - pv.y.w;
+        fp->d = pv.w.w - pv.y.z;
+
+        rmag = zpl_rsqrt(zpl_square(fp->a) + zpl_square(fp->b) + zpl_square(fp->c));
+
+        fp->a *= rmag;
+        fp->b *= rmag;
+        fp->c *= rmag;
+        fp->d *= rmag;
+
+        fp = &out->y2;
+
+        fp->a = pv.x.w + pv.y.x;
+        fp->b = pv.y.w + pv.y.y;
+        fp->c = pv.z.w + pv.y.z;
+        fp->d = pv.w.w + pv.y.w;
+
+        rmag = zpl_rsqrt(zpl_square(fp->a) + zpl_square(fp->b) + zpl_square(fp->c));
+
+        fp->a *= rmag;
+        fp->b *= rmag;
+        fp->c *= rmag;
+        fp->d *= rmag;;
+
+        fp = &out->z1;
+
+        fp->a = pv.x.w + pv.z.x;
+        fp->b = pv.y.w + pv.z.y;
+        fp->c = pv.z.w + pv.z.z;
+        fp->d = pv.w.w + pv.z.w;
+
+        rmag = zpl_rsqrt(zpl_square(fp->a) + zpl_square(fp->b) + zpl_square(fp->c));
+
+        fp->a *= rmag;
+        fp->b *= rmag;
+        fp->c *= rmag;
+        fp->d *= rmag;
+
+        fp = &out->z2;
+
+        fp->a = pv.x.w - pv.z.x;
+        fp->b = pv.y.w - pv.z.y;
+        fp->c = pv.z.w - pv.z.z;
+        fp->d = pv.w.w - pv.z.w;
+
+        rmag = zpl_rsqrt(zpl_square(fp->a) + zpl_square(fp->b) + zpl_square(fp->c));
+
+        fp->a *= rmag;
+        fp->b *= rmag;
+        fp->c *= rmag;
+        fp->d *= rmag;
+    }
+
+    zpl_b8 zpl_frustum_sphere_inside(zpl_frustum* frustum, zpl_vec3 center, zpl_f32 radius) {
+        if (zpl_plane_distance(&frustum->x1, center) <= -radius) return 0;
+        if (zpl_plane_distance(&frustum->x2, center) <= -radius) return 0;
+        if (zpl_plane_distance(&frustum->y1, center) <= -radius) return 0;
+        if (zpl_plane_distance(&frustum->y2, center) <= -radius) return 0;
+        if (zpl_plane_distance(&frustum->z1, center) <= -radius) return 0;
+        if (zpl_plane_distance(&frustum->z2, center) <= -radius) return 0;
+
+        return 1;
+    }
+
+    zpl_b8 zpl_frustum_point_inside(zpl_frustum* frustum, zpl_vec3 point) {
+        return zpl_frustum_sphere_inside(frustum, point, 0.0f);
+    }
+
+    zpl_b8 zpl_frustum_box_inside(zpl_frustum* frustum, zpl_aabb3 aabb) {
+        
+        zpl_vec3 box = aabb.half_size;
+        zpl_vec3 v, b;
+
+        b = zpl_vec3f(-box.x, -box.y, -box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(+box.x, -box.y, -box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(-box.x, +box.y, -box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(+box.x, +box.y, -box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(+box.x, +box.y, +box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(-box.x, +box.y, +box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(-box.x, -box.y, +box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        b = zpl_vec3f(+box.x, -box.y, +box.z);
+        zpl_vec3_add(&v, b, aabb.centre);
+
+        if (zpl_frustum_point_inside(frustum, v)) return 1;
+
+        return 0;
     }
 
     zpl_f32 zpl_lerp(zpl_f32 a, zpl_f32 b, zpl_f32 t) { return a * (1.0f - t) + b * t; }

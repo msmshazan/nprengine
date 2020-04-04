@@ -979,7 +979,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
         io->Fonts->TexID = (ImTextureID)bgfx_create_texture_2d(fwidth,fheight,false,1,BGFX_TEXTURE_FORMAT_RGBA8,BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT,bgfx_make_ref(pixels,fwidth*fheight*fbpp)).idx;    
         setupStyle(true);
     }
-    Mesh CubeMesh = LoadMesh(ArenaAllocator,"bunny.bin");
+    Mesh TestMesh = LoadMesh(ArenaAllocator,"bunny.bin");
     bgfx_uniform_handle_t u_time = bgfx_create_uniform("u_time", BGFX_UNIFORM_TYPE_VEC4,1);
     Effect ImGuiShader = LoadShader(ArenaAllocator,"vs_imgui.bin","fs_imgui.bin");
     Effect MeshShader = LoadShader(ArenaAllocator,"vs_mesh.bin","fs_mesh.bin");
@@ -994,7 +994,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
     bgfx_vertex_layout_end(&ImGuiVertexLayout);
     bgfx_set_view_clear(0,BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH,0x303030ff,1,0);
     zpl_vec3 at  = { 0.0f, 1.0f,  0.0f };
-    zpl_vec3 eye = { 0.0f, 1.0f,  2.5f };
+    zpl_vec3 eye = { 0.0f, 1.0f,  -2.5f };
     zpl_f64 prevtime = zpl_time_now();
     while(App.Running)
     {
@@ -1035,20 +1035,20 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
         bgfx_set_view_rect(0,0,0,App.width,App.height);
         bgfx_touch(0);
         float time = (float)(zpl_time_now() - prevtime);
-        time = 0;
+        //time = 0;
         bgfx_set_uniform(u_time,&time,1);
         const bgfx_caps_t* caps = bgfx_get_caps();
         {
             zpl_vec3 up = { 0.0f, 1.0f, 0.0f };
             zpl_mat4 view = {};
-            zpl_mat4_look_at(&view, eye, at,up);
+            zpl_mat4_look_at_lh(&view, eye, at,up);
             zpl_mat4 proj = {};
-            zpl_mat4_perspective_DX(&proj, zpl_to_radians(60.0f), float(App.width)/float(App.height), 0.1f, 100.0f);
+            zpl_mat4_perspective_dx_lh(&proj, zpl_to_radians(60.0f), float(App.width)/float(App.height), 0.1f, 100.0f);
             bgfx_set_view_transform(0, view.e, proj.e);
         }
         zpl_mat4 mtx;
         zpl_mat4_rotate(&mtx,{0,1,0},time*0.37f);
-        RenderMesh(&CubeMesh,0,&MeshShader,mtx.e);
+        RenderMesh(&TestMesh,0,&MeshShader,mtx.e);
         
         // Draw ImGUI
         if(true)

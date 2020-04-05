@@ -980,7 +980,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
         setupStyle(true);
     }
     Mesh TestMesh = LoadMesh(ArenaAllocator,"bunny.bin");
-    bgfx_uniform_handle_t u_time = bgfx_create_uniform("u_time", BGFX_UNIFORM_TYPE_VEC4,1);
+    //bgfx_uniform_handle_t u_time = bgfx_create_uniform("u_time", BGFX_UNIFORM_TYPE_VEC4,1);
+    bgfx_uniform_handle_t u_highlightcolor = bgfx_create_uniform("u_highlightcolor", BGFX_UNIFORM_TYPE_VEC4,1);
+    bgfx_uniform_handle_t u_surfacecolor = bgfx_create_uniform("u_surfacecolor", BGFX_UNIFORM_TYPE_VEC4,1);
+    bgfx_uniform_handle_t u_coolfactor = bgfx_create_uniform("u_coolfactor", BGFX_UNIFORM_TYPE_VEC4,1);
+    bgfx_uniform_handle_t u_warmfactor = bgfx_create_uniform("u_warmfactor", BGFX_UNIFORM_TYPE_VEC4,1);
     Effect ImGuiShader = LoadShader(ArenaAllocator,"vs_imgui.bin","fs_imgui.bin");
     Effect MeshShader = LoadShader(ArenaAllocator,"vs_mesh.bin","fs_mesh.bin");
     uint32_t WhiteTex[] = {0xffffffff};
@@ -996,6 +1000,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
     zpl_vec3 at  = { 0.0f, 1.0f,  0.0f };
     zpl_vec3 eye = { 0.0f, 1.0f,  -2.5f };
     zpl_f64 prevtime = zpl_time_now();
+    zpl_vec4 highlightcolor = {1,1,1,1};
+    zpl_vec4 surfacecolor = {0,1,0,1};
+    zpl_vec4 coolfactor = {0,0,0.55f,0.25f};
+    zpl_vec4 warmfactor = {0.3f,0.3f,0,0.25f};
     while(App.Running)
     {
         SwitchToFiber(App.Win32MessageProcFiber);
@@ -1024,9 +1032,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
         if(ImGui::Begin("NPR Engine DEBUG"))
         {
             ImGui::Text("NPR Debug Test");
-            ImGui::SliderFloat3("At:",at.e,-10,10);
-            ImGui::SliderFloat3("Eye:",eye.e,-10,10);
-                
+            ImGui::SliderFloat3("At",at.e,-10,10);
+            ImGui::SliderFloat3("Eye",eye.e,-10,10);
+            ImGui::ColorPicker3("WarmColor",warmfactor.e);
+            ImGui::SliderFloat("WarmFactor",&warmfactor.w,0,10);            
+            ImGui::ColorPicker3("CoolColor",coolfactor.e);
+            ImGui::SliderFloat("CoolFactor",&coolfactor.w,0,10);            
+            ImGui::ColorPicker4("SurfaceColor",surfacecolor.e);
         }
         ImGui::End();
         ImGui::EndFrame();
@@ -1036,7 +1048,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,int nS
         bgfx_touch(0);
         float time = (float)(zpl_time_now() - prevtime);
         //time = 0;
-        bgfx_set_uniform(u_time,&time,1);
+        bgfx_set_uniform(u_highlightcolor,&highlightcolor,1);
+        bgfx_set_uniform(u_surfacecolor,&surfacecolor,1);
+        bgfx_set_uniform(u_coolfactor,&coolfactor,1);
+        bgfx_set_uniform(u_warmfactor,&warmfactor,1);
+        //bgfx_set_uniform(u_time,&time,1);
         const bgfx_caps_t* caps = bgfx_get_caps();
         {
             zpl_vec3 up = { 0.0f, 1.0f, 0.0f };
